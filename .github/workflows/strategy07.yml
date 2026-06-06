@@ -1,0 +1,36 @@
+name: Strategy07 实盘
+
+on:
+  schedule:
+    - cron: '25 1 * * 1-5'   # 早盘 9:25 CST
+    - cron: '10 7 * * 1-5'   # 收盘 15:10 CST
+  workflow_dispatch:
+
+jobs:
+  morning:
+    if: github.event.schedule == '25 1 * * 1-5' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: 早盘风险检查
+        run: cd scripts && python morning_risk_check.py
+
+  afternoon:
+    if: github.event.schedule == '10 7 * * 1-5' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: 收盘扫描+推送
+        run: cd scripts && python daily_feishu.py
+      - name: 保存持仓状态
+        run: |
+          git config user.name "Strategy07 Bot"
+          git config user.email "bot@strategy07.local"
+          git add data/live_portfolio.json output/live_logs/
+          git diff --staged --quiet || (git commit -m "auto: $(date +%Y-%m-%d)" && git push)
